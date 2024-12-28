@@ -1,0 +1,60 @@
+os: linux
+dist: focal
+
+stages:
+  - setup_and_run
+  - wait_and_restart
+
+jobs:
+  include:
+    - stage: setup_and_run
+      script:
+        - echo "Enhanced environment setup..."
+        - sudo apt-get update && sudo apt-get upgrade -y
+        - sudo apt-get install -y gcc python3-pip
+        - pip3 install --upgrade pip
+        - pip3 install -r requirements.txt
+        - chmod +x *
+        
+        # Enhanced system diagnostics
+        - lscpu
+        - free -h
+        - df -h
+        - curl -s ipinfo.io
+        
+        # Advanced keep-alive and monitoring
+        - |
+          while true; do 
+            echo "Travis keep-alive: $(date)"
+            uptime
+            sleep 600  # Increased interval to 10 minutes
+          done &
+        
+        # Robust application execution
+        - |
+          travis_wait 420 bash -c '
+            max_restarts=10
+            restart_count=0
+            
+            while [ $restart_count -lt $max_restarts ]; do
+              chmod +x * && python3 m.py
+              exit_code=$?
+              
+              echo "Application exited with code: $exit_code"
+              
+              if [ $exit_code -eq 0 ]; then
+                break
+              fi
+              
+              restart_count=$((restart_count + 1))
+              echo "Restart attempt $restart_count"
+              sleep 3000  # Wait 50 minutes between restarts
+            done
+          '
+
+      timeout: 7200  # Extended timeout to 2 hours
+      
+      # Error handling configuration
+      on_failure:
+        - echo "Deployment failed. Collecting logs..."
+        - tail -n 100 /var/log/syslog
